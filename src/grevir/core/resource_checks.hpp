@@ -81,7 +81,10 @@ struct SelfModuleParamsConflictTest<> {
 template <typename Param>
 struct SelfModuleParamsConflictTest<Param> {
   using value_type = bool;
-  constexpr static value_type value = false;
+  // A single parameter can contain several resources; validate its own claims
+  // even when no second parameter exists to trigger a pairwise comparison.
+  constexpr static value_type value =
+    Param::Claims::Resources::template eval<SelfParamsConflictTest>::value;
 };
 
 template <typename Param1, typename Param2, typename... Params>

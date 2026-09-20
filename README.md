@@ -54,11 +54,13 @@ Enable runtime tests with `GREVIR_BUILD_HOST_TESTS=ON`. Catch2 3.8.1 is an opt-i
 host development dependency; normal library builds and installed consumers do not
 require it. See [tests/README.md](tests/README.md) for online/offline setup and
 execution commands. Tests also pass in a standalone Core checkout with installed
-Base and a locally supplied Catch2 source. The installed consumer now runs too.
+Base, Grevir Test Support and provisioned Catch2. Shared test-dependency setup
+lives in the development-only Test Support package. The installed consumer runs too.
 
 Hardware validation is on hold. These fixtures validate Core dispatch and storage;
 they do not validate GPIO, elapsed time, interrupts, register side effects or MCU
-backend behavior. Those behavioral fixtures remain future host-side work.
+backend behavior. Grevir Peripherals now supplies separate GPIO/clock cases;
+register/interrupt fixtures and MCU adapters remain future work.
 
 ## Compilation and limits
 
@@ -68,7 +70,7 @@ Apple Clang 21 on arm64 macOS, C++23, standard library enabled:
   closure, graph lookup, board traits and singleton uses compile.
 - The historical dependency assertions and shared/range claim assertions compile.
   Both historical singleton module styles compile against test-only bindings.
-- Two valid application probes compile. Eight conflict probes and two cycle probes
+- Six valid application probes compile. Seventeen conflict probes and two cycle probes
   are rejected with their expected diagnostics; see [tests/README.md](tests/README.md).
 - Separate copies of Base and Core build and install outside the workspace. A
   two-translation-unit consumer links against installed packages with both source
@@ -91,10 +93,6 @@ rejected with `GREVIR_CORE_PARAMETER_INDEX_OUT_OF_RANGE`. The public alias is un
 
 Known inherited limitations, explicitly deferred to focused correctness changes:
 
-- A single module with a single parameter containing duplicate resources can
-  evade the internal-claim check. The negative internal-claim probe includes a
-  second parameter to exercise the existing checker; it does not establish full
-  coverage of every application shape.
 - `RootDependencies<T>` returns an empty tuple for a resource whose own
   `dependencies` is empty, although nested traversal treats that resource as a
   root. This legacy distinction is preserved and covered by static assertions.
@@ -105,3 +103,17 @@ Known inherited limitations, explicitly deferred to focused correctness changes:
 The original source remains in Ardoinus. Source history import, API namespace
 modernization and eventual removal from the original checkout are separate work.
 The original project's MIT notice is copied unchanged in `LICENSE.txt`.
+
+## Resource-claim policy — 21 September 2026
+
+Repeated exclusive resources and conflicting ranges are errors, including inside
+a single parameter of a single module. The singleton-parameter check now inspects
+its claim list directly, so adding an unrelated parameter no longer changes
+whether an internal conflict is rejected. Overlapping, contained and identical
+ranges conflict, as does claiming a whole resource together with a subrange.
+
+Adjacent ranges remain valid because their end is exclusive. Ranges on distinct
+resource types do not conflict. Explicit shared-use claims with identical resource,
+ID and configuration remain compatible; differing configurations on the same ID
+are rejected. Shared dependency modules still execute once; listing the same module
+as a dependency does not create a second instance or a second owner.

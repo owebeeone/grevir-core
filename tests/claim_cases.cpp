@@ -3,6 +3,7 @@
 namespace {
 using namespace ardo;
 struct Bank {};
+struct OtherBank {};
 struct Timer {};
 struct Slow {};
 struct Fast {};
@@ -76,6 +77,61 @@ template <>
 struct Case<10> { using App = Application<CycleA>; };
 template <>
 struct Case<11> { using App = Application<SelfCycle>; };
+template <>
+struct Case<12> {
+  using App = Application<Module<0, Param<GPIOResource<1>, GPIOResource<1>>>>;
+};
+template <>
+struct Case<13> {
+  using App = Application<Module<0, Param<range_claim<Bank, 0, 4>, range_claim<Bank, 3, 8>>>>;
+};
+template <>
+struct Case<14> {
+  using App = Application<Module<0, Param<range_claim<Bank, 0, 8>, range_claim<Bank, 2, 4>>>>;
+};
+template <>
+struct Case<15> {
+  using App = Application<Module<0, Param<Bank, range_claim<Bank, 0, 4>>>>;
+};
+template <>
+struct Case<16> {
+  using App = Application<Module<0, Param<range_claim<Bank, 0, 4>, Bank>>>;
+};
+template <>
+struct Case<17> {
+  using App = Application<Module<0, Param<range_claim<Bank, 0, 4>, range_claim<Bank, 0, 4>>>>;
+};
+template <>
+struct Case<18> {
+  using App = Application<Module<0, Param<shared_use_claim<Timer, 0, Slow>,
+    shared_use_claim<Timer, 0, Fast>>>>;
+};
+template <>
+struct Case<19> {
+  using App = Application<Module<0, Param<shared_use_claim<Timer, 0, Slow>,
+    shared_use_claim<Timer, 0, Slow>>>>;
+};
+template <>
+struct Case<20> {
+  using App = Application<Module<0, Param<range_claim<Bank, 0, 4>,
+    range_claim<OtherBank, 0, 4>>>>;
+};
+template <>
+struct Case<21> { using App = Application<Module<0, Param<>>>; };
+template <>
+struct Case<22> {
+  using App = Application<Module<0, Param<GPIOResource<1>, GPIOResource<2>,
+    range_claim<Bank, 0, 4>, range_claim<Bank, 4, 8>,
+    shared_use_claim<Timer, 1, Slow>, shared_use_claim<Timer, 2, Fast>>>>;
+};
+template <>
+struct Case<23> {
+  using App = Application<Module<0, Param<GPIOResource<1>, GPIOResource<2>, GPIOResource<1>>>>;
+};
+using InvalidDependency = Module<0, Param<GPIOResource<1>, GPIOResource<1>>>;
+struct DependsOnInvalid : ModuleBase<Parameters<>, DependentModules<InvalidDependency>> {};
+template <>
+struct Case<24> { using App = Application<DependsOnInvalid>; };
 
 using Selected = typename Case<CASE_ID>::App;
 static_assert(sizeof(Selected) > 0);
