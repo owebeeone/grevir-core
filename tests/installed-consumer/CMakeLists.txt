@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(grevir_core_installed_consumer LANGUAGES CXX)
+find_package(grevir-core CONFIG REQUIRED)
+add_executable(core_consumer main.cpp other.cpp)
+target_link_libraries(core_consumer PRIVATE grevir::core)
+set_target_properties(core_consumer PROPERTIES CXX_EXTENSIONS OFF)
