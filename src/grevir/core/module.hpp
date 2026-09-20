@@ -61,12 +61,18 @@ public:
  * Fetches a template parameter by index.
  */
 template <unsigned index, typename... P>
-class ParamByIndex;
+class ParamByIndex {
+  static_assert(index < sizeof...(P), "GREVIR_CORE_PARAMETER_INDEX_OUT_OF_RANGE");
+};
 
 template <unsigned index, typename W, typename... P>
-class ParamByIndex<index, W, P...> {
+class ParamByIndex<index, W, P...>
+    : public ParamByIndex<index - 1, P...> {};
+
+template <typename W, typename... P>
+class ParamByIndex<0, W, P...> {
 public:
-  using param = typename std::conditional<index == 0, W, ParamByIndex<index - 1, P...>>::type;
+  using param = W;
 };
 
 /**

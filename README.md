@@ -83,10 +83,14 @@ register header was removed by using Base's equivalent `tuple_contained_in`
 trait in place of `has_type_v`. `device_map.hpp` now directly includes its required
 integer declarations. Production headers do not include test-only bindings.
 
+Parameter indexing was fixed on 21 September 2026: `Parameters<...>::Param<N>`
+now resolves to the selected type through recursive inheritance and a zero-index
+specialization. Regression assertions cover first/middle/last indices, repeated
+types, references and incomplete types. Empty lists and out-of-range indices are
+rejected with `GREVIR_CORE_PARAMETER_INDEX_OUT_OF_RANGE`. The public alias is unchanged.
+
 Known inherited limitations, explicitly deferred to focused correctness changes:
 
-- `Parameters<...>::Param<N>` returns a `ParamByIndex` wrapper for nonzero `N`,
-  rather than the indexed parameter. Current singleton probes use index zero.
 - A single module with a single parameter containing duplicate resources can
   evade the internal-claim check. The negative internal-claim probe includes a
   second parameter to exercise the existing checker; it does not establish full

@@ -10,7 +10,7 @@ foreach(header IN LISTS public_headers)
 endforeach()
 
 add_library(grevir_core_compile OBJECT native_compile.cpp
-  dependent_module_test.cpp resource_claims_test.cpp singleton_test.cpp
+  dependent_module_test.cpp resource_claims_test.cpp singleton_test.cpp parameter_index_test.cpp
   ${header_sources})
 target_link_libraries(grevir_core_compile PRIVATE grevir::core)
 set_target_properties(grevir_core_compile PROPERTIES CXX_EXTENSIONS OFF)
@@ -28,5 +28,5 @@ add_custom_target(grevir_core_claim_checks ALL
     "-DCASE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/claim_cases.cpp"
     "-DLOG_DIR=${CMAKE_CURRENT_BINARY_DIR}/claim-results"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/check_claims.cmake"
-  COMMENT "Checking valid applications and expected resource-conflict failures"
+  COMMENT "Checking application diagnostics and parameter index bounds"
   VERBATIM)

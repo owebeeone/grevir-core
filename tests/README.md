@@ -63,6 +63,14 @@ Enable with `GREVIR_BUILD_COMPILE_CHECKS=ON`; `cmake --build` runs both targets:
 | 10 | A two-module dependency cycle is rejected |
 | 11 | A module depending on itself is rejected |
 
+`parameter_index_test.cpp` adds ten compile-time assertions for first, middle and
+last selection, a singleton list, repeated types, exact reference/void/incomplete
+types and direct helper use. These reproduced the positive-index bug before the
+21 September fix. The compiler-probe target also checks valid indices 0 and 1,
+then requires `GREVIR_CORE_PARAMETER_INDEX_OUT_OF_RANGE` for a one-past-end index,
+a larger index and index zero of an empty list. These three expected bounds
+failures are additional to the ten application failures above.
+
 Outputs are retained under the build directory's `tests/claim-results/`.
 These probes are currently for native Clang/GNU-style drivers; only Apple Clang
 21 has been validated. They do not establish target compilation or runtime
