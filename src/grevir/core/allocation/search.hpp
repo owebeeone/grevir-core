@@ -1,7 +1,7 @@
 #pragma once
-#include <array>
-#include <cstddef>
-#include <cstdint>
+#include <grevir/base/compat/array.hpp>
+#include <grevir/base/compat/cstddef.hpp>
+#include <grevir/base/compat/cstdint.hpp>
 
 namespace grevir::allocation {
 
