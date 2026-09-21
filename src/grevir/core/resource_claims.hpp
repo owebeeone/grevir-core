@@ -91,6 +91,13 @@ struct has_conflict<range_claim<T, Begin, End>, T> : std::true_type {};
 template<typename T, int Begin, int End>
 struct has_conflict<T, range_claim<T, Begin, End>> : std::true_type {};
 
+// A whole-resource owner excludes shared users too. Sharing is permitted
+// only between the compatible shared claims below, not with exclusive ownership.
+template <typename T, int Id, typename Param>
+struct has_conflict<T, shared_use_claim<T,Id,Param>> : std::true_type {};
+template <typename T, int Id, typename Param>
+struct has_conflict<shared_use_claim<T,Id,Param>, T> : std::true_type {};
+
 // If shared use is identical, then there is no conflict.
 template<typename T, int Id, typename Param>
 struct has_conflict<shared_use_claim<T, Id, Param>, shared_use_claim<T, Id, Param>> 

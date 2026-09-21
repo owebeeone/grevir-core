@@ -97,7 +97,8 @@ Known inherited limitations, explicitly deferred to focused correctness changes:
   `dependencies` is empty, although nested traversal treats that resource as a
   root. This legacy distinction is preserved and covered by static assertions.
 - `allocation.hpp` contains only the legacy `SelectionResolver` pass-through
-  placeholder. It is not a resource allocator. Resource graph cycles beyond the
+  placeholder; the new installed search is in `allocation/search.hpp`, with
+  application integration in `allocated_application.hpp`. Resource graph cycles beyond the
   documented self-root convention are unsupported; use an acyclic graph.
 
 The original source remains in Ardoinus. Source history import, API namespace
@@ -117,3 +118,13 @@ resource types do not conflict. Explicit shared-use claims with identical resour
 ID and configuration remain compatible; differing configurations on the same ID
 are rejected. Shared dependency modules still execute once; listing the same module
 as a dependency does not create a second instance or a second owner.
+
+## Installed portable PWM integration
+
+The fixed-frequency ATmega328P PWM MVP now uses installed Core, Peripherals and AVR
+headers. Core collects module requests and existing resource claims; AVR supplies
+candidates and typed endpoints. Application setup initializes the selected owners
+before parameter/module callbacks. See the workspace's
+`dev-docs/GrevirPwmIntegration.md` for the complete example, resource identity rules,
+startup preconditions and current limits. AVR compiler/hardware validation remains
+on hold; native package installation does not establish MCU toolchain support.

@@ -10,3 +10,5 @@
 #include <grevir/core/resource_claims.hpp>
 #include <grevir/core/resource_graph.hpp>
 #include <grevir/core/singleton.hpp>
+#include <grevir/core/allocated_application.hpp>
+#include <grevir/core/allocation/search.hpp>
