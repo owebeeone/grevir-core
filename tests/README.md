@@ -44,7 +44,7 @@ Enable with `GREVIR_BUILD_COMPILE_CHECKS=ON`; `cmake --build` runs both targets:
   singleton module declarations. The singleton cases use compile-only pins and
   a sequence-poller stub, not the future behavioral hardware fixture. Empty
   historical runtime harness shells were not carried into production or tests.
-- `grevir_core_claim_checks`: invokes the configured Clang/GNU compiler driver
+- `grevir_core_claim_checks`: invokes the configured Clang/GNU or MSVC compiler driver
   on `claim_cases.cpp`, without linking or executing an application. Six positive
   cases must pass before any expected failure is accepted. Each negative case
   must exit unsuccessfully and emit the expected static-assert diagnostic.
@@ -90,8 +90,8 @@ a larger index and index zero of an empty list. These three expected bounds
 failures are additional to the nineteen application failures above.
 
 Outputs are retained under the build directory's `tests/claim-results/`.
-These probes are currently for native Clang/GNU-style drivers; only Apple Clang
-21 has been validated. They do not establish target compilation or runtime
+These probes run on native Apple Clang, GNU and MSVC drivers; Apple Clang 21
+and MSVC 19.44 have been validated. They do not establish target compilation or runtime
 behavior. Known untested/incorrect legacy cases are listed in the library README.
 
 ## Installed-package consumer
