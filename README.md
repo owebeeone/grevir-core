@@ -1,5 +1,15 @@
 # Grevir Core
 
+**Public API:** [Grevir Core](https://github.com/owebeeone/grevir-wz/blob/main/docs/api/core.md).
+See [installation](https://github.com/owebeeone/grevir-wz/blob/main/docs/install.md) and
+[supported platforms](https://github.com/owebeeone/grevir-wz/blob/main/docs/supported.md).
+The workspace `/docs` is the current user-facing contract; development
+checkpoints below are historical.
+
+Declarative modules, lifecycle, dependency closure and resource claims.
+
+## Development record (historical)
+
 Portable module parameters/dependencies, application composition and lifecycle,
 singleton storage, resource claims/checks, board inventory traits and resource
 topology extracted from Ardoinus. This header-only library depends only on Grevir
