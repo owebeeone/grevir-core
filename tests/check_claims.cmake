@@ -1,9 +1,17 @@
 cmake_minimum_required(VERSION 3.20)
 
 file(MAKE_DIRECTORY "${LOG_DIR}")
-set(flags -std=c++23 -DHAS_STD_LIB=1 -fsyntax-only "-I${CORE_INCLUDE}")
+if(COMPILER_ID STREQUAL "MSVC")
+  set(flags /nologo /std:c++latest /Zc:__cplusplus /Zs /DHAS_STD_LIB=1 "/I${CORE_INCLUDE}")
+  set(include_flag /I)
+  set(define_flag /D)
+else()
+  set(flags -std=c++23 -DHAS_STD_LIB=1 -fsyntax-only "-I${CORE_INCLUDE}")
+  set(include_flag -I)
+  set(define_flag -D)
+endif()
 foreach(directory IN LISTS BASE_INCLUDES)
-  list(APPEND flags "-I${directory}")
+  list(APPEND flags "${include_flag}${directory}")
 endforeach()
 
 # Prove that the same compiler, includes and source work before accepting any
@@ -12,9 +20,10 @@ set(valid_cases 0 1 19 20 21 22)
 set(invalid_cases 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 23 24)
 set(internal_conflict_cases 8 12 13 14 15 16 17 18 23 24)
 foreach(case IN LISTS valid_cases invalid_cases)
-  execute_process(COMMAND "${CXX}" ${flags} "-DCASE_ID=${case}" "${CASE_SOURCE}"
+  execute_process(COMMAND "${CXX}" ${flags} "${define_flag}CASE_ID=${case}" "${CASE_SOURCE}"
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE errors)
-  file(WRITE "${LOG_DIR}/case-${case}.log" "${output}${errors}")
+  set(diagnostics "${output}${errors}")
+  file(WRITE "${LOG_DIR}/case-${case}.log" "${diagnostics}")
   if(case IN_LIST valid_cases)
     if(NOT result STREQUAL "0")
       message(FATAL_ERROR "Positive claim case ${case} failed:\n${output}${errors}")
@@ -32,8 +41,8 @@ foreach(case IN LISTS valid_cases invalid_cases)
     else()
       set(diagnostic "Application has resource conflict")
     endif()
-    if(NOT errors MATCHES "static assertion failed[^\n]*${diagnostic}")
-      message(FATAL_ERROR "Claim case ${case} failed without its expected diagnostic:\n${errors}")
+    if(NOT diagnostics MATCHES "(static assertion failed|static_assert failed)[^\n]*${diagnostic}")
+      message(FATAL_ERROR "Claim case ${case} failed without its expected diagnostic:\n${diagnostics}")
     endif()
   endif()
 endforeach()
@@ -43,17 +52,18 @@ message(STATUS "Core compile probes: ${valid_count} valid applications and ${inv
 
 function(check_parameter_index index empty expect_success)
   execute_process(COMMAND "${CXX}" ${flags}
-    "-DPARAM_INDEX=${index}" "-DEMPTY_PARAMS=${empty}"
+    "${define_flag}PARAM_INDEX=${index}" "${define_flag}EMPTY_PARAMS=${empty}"
     "${CMAKE_CURRENT_LIST_DIR}/parameter_index_probe.cpp"
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE errors)
-  file(WRITE "${LOG_DIR}/parameter-${index}-empty-${empty}.log" "${output}${errors}")
+  set(diagnostics "${output}${errors}")
+  file(WRITE "${LOG_DIR}/parameter-${index}-empty-${empty}.log" "${diagnostics}")
   if(expect_success)
     if(NOT result STREQUAL "0")
       message(FATAL_ERROR "Valid parameter index ${index} failed:\n${output}${errors}")
     endif()
   elseif(NOT result MATCHES "^[1-9][0-9]*$" OR
-      NOT errors MATCHES "static assertion failed[^\n]*GREVIR_CORE_PARAMETER_INDEX_OUT_OF_RANGE")
-    message(FATAL_ERROR "Parameter index ${index}, empty=${empty}: expected bounds diagnostic; got ${result}:\n${output}${errors}")
+      NOT diagnostics MATCHES "(static assertion failed|static_assert failed)[^\n]*GREVIR_CORE_PARAMETER_INDEX_OUT_OF_RANGE")
+    message(FATAL_ERROR "Parameter index ${index}, empty=${empty}: expected bounds diagnostic; got ${result}:\n${diagnostics}")
   endif()
 endfunction()
 

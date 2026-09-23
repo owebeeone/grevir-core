@@ -15,14 +15,14 @@ add_library(grevir_core_compile OBJECT native_compile.cpp
 target_link_libraries(grevir_core_compile PRIVATE grevir::core)
 set_target_properties(grevir_core_compile PROPERTIES CXX_EXTENSIONS OFF)
 
-# These are compiler-only checks, not a runtime test harness. Restrict the
-# driver flags to the compiler families that understand them.
-if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
-  message(FATAL_ERROR "Core conflict probes currently require a Clang/GNU driver")
+# These are compiler-only checks, not a runtime test harness.
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU|MSVC)$")
+  message(FATAL_ERROR "Unsupported compiler for Core conflict probes")
 endif()
 add_custom_target(grevir_core_claim_checks ALL
   COMMAND "${CMAKE_COMMAND}"
     "-DCXX=${CMAKE_CXX_COMPILER}"
+    "-DCOMPILER_ID=${CMAKE_CXX_COMPILER_ID}"
     "-DCORE_INCLUDE=${PROJECT_SOURCE_DIR}/src"
     "-DBASE_INCLUDES=$<TARGET_PROPERTY:grevir::base,INTERFACE_INCLUDE_DIRECTORIES>"
     "-DCASE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/claim_cases.cpp"
