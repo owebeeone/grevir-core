@@ -20,8 +20,11 @@ install(DIRECTORY src/ DESTINATION include FILES_MATCHING
   PATTERN "*.hpp" PATTERN "*.h")
 install(EXPORT GrevirCoreTargets NAMESPACE grevir::
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/grevir-core)
-install(FILES cmake/grevir-core-config.cmake
+install(FILES cmake/grevir-core-config.cmake cmake/GrevirInterruptBindings.cmake
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/grevir-core)
+install(DIRECTORY tools/grevir_irqgen/
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/grevir-core/tools/grevir_irqgen
+  FILES_MATCHING PATTERN "*.py" PATTERN "__pycache__" EXCLUDE)
 install(FILES LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/grevir-core)
 
 option(GREVIR_BUILD_COMPILE_CHECKS "Compile native headers and template users" OFF)

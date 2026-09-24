@@ -8,6 +8,11 @@ checkpoints below are historical.
 
 Declarative modules, lifecycle, dependency closure and resource claims.
 
+Core also provides the interrupt event catalog, handler-demand gate,
+probe record and installed `grevir-irqgen` tool with a CMake binding function.
+The current mock, AVR Timer1-overflow and classic ESP32 TG0/T0 slice is
+documented in the [interrupt guide](https://github.com/owebeeone/grevir-wz/blob/main/docs/guides/interrupts.md).
+
 ## Development record (historical)
 
 Portable module parameters/dependencies, application composition and lifecycle,
@@ -40,7 +45,8 @@ compile checks disabled and does not download dependencies.
 
 For Arduino packaging, both checkouts belong directly under `libraries/`.
 `library.properties` declares `depends=Grevir Base`. Real Arduino dependency
-discovery and target toolchains remain unvalidated.
+discovery is exercised by the staged Uno and classic ESP32 interrupt examples;
+direct IDE builds still require a separate generator integration.
 
 ## Host mock validation — 20 September 2026
 
