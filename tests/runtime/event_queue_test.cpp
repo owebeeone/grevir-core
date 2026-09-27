@@ -10,7 +10,8 @@ namespace irq = grevir::interrupt;
 struct A { using Key = irq::EventKey<"test", "a", "event">; };
 struct B { using Key = irq::EventKey<"test", "b", "event">; };
 struct C { using Key = irq::EventKey<"test", "c", "event">; };
-struct Request { using InterruptEvents = setl::TypeArgs<A, B, C>; };
+struct S { using Key = irq::EventKey<"test", "s", "event">; };
+struct Request { using InterruptEvents = setl::TypeArgs<A, B, C, S>; };
 template <class>
 struct Module : ardo::ModuleBase<ardo::Parameters<>> {};
 using Owner = grevir::RequestedModule<setl::TypeArgs<Request>, Module>;
@@ -29,6 +30,12 @@ inline unsigned callback_depth = 0;
 inline unsigned maximum_callback_depth = 0;
 
 } // namespace event_queue_test
+
+template <>
+struct grevir::event::RouteFor<event_queue_test::S> {
+  using Context = grevir::event::MainLoop;
+  using Delivery = grevir::event::Stream;
+};
 
 template <>
 inline void grevir::on_event<event_queue_test::A>() noexcept {
@@ -58,6 +65,11 @@ inline void grevir::on_event<event_queue_test::B>() noexcept {
 template <>
 inline void grevir::on_event<event_queue_test::C>() noexcept {
   event_queue_test::seen.push_back('c');
+}
+
+template <>
+inline void grevir::on_event<event_queue_test::S>() noexcept {
+  event_queue_test::seen.push_back('s');
 }
 
 TEST_CASE("main-loop events elide and preserve bounded queue order", "[core][event]") {
@@ -107,5 +119,34 @@ TEST_CASE("main-loop dispatch does not nest callbacks", "[core][event]") {
   REQUIRE(seen == std::vector<char>{'a'});
   REQUIRE(grevir::event::dispatch<App>(1) == 1);
   REQUIRE(seen == std::vector<char>{'a', 'a'});
+  grevir::event::stop<App>();
+}
+
+TEST_CASE("stream retains each accepted firing and recovers after overflow", "[core][event]") {
+  using namespace event_queue_test;
+  using grevir::event::PostResult;
+  grevir::event::stop<App>();
+  seen.clear();
+  grevir::event::prepare<App>();
+  REQUIRE(grevir::event::post_from_isr<App, S>() == PostResult::queued);
+  REQUIRE(grevir::event::post_from_isr<App, S>() == PostResult::queued);
+  REQUIRE(grevir::event::post_from_isr<App, S>() == PostResult::full);
+  REQUIRE(grevir::event::overrun<App>());
+  REQUIRE(grevir::event::dispatch<App>(1) == 1);
+  REQUIRE(seen == std::vector<char>{'s'});
+  REQUIRE(grevir::event::post<App, S>() == PostResult::queued);
+  REQUIRE(grevir::event::dispatch<App>(2) == 2);
+  REQUIRE(seen == std::vector<char>{'s', 's', 's'});
+  REQUIRE(grevir::event::overrun<App>());
+  REQUIRE(grevir::event::post<App, S>() == PostResult::queued);
+  grevir::event::stop<App>();
+  grevir::event::prepare<App>();
+  REQUIRE(grevir::event::dispatch<App>(1) == 0);
+  REQUIRE_FALSE(grevir::event::overrun<App>());
+  REQUIRE(grevir::event::post<App, A>() == PostResult::queued);
+  REQUIRE(grevir::event::post<App, S>() == PostResult::queued);
+  REQUIRE(grevir::event::post<App, A>() == PostResult::coalesced);
+  REQUIRE(grevir::event::dispatch<App>(2) == 2);
+  REQUIRE(seen == std::vector<char>{'s', 's', 's', 'a', 's'});
   grevir::event::stop<App>();
 }

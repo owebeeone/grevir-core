@@ -56,18 +56,25 @@ class MainLoopQueue {
       "GREVIR_EVENT_NOT_IN_APPLICATION");
     using Route = RouteFor<Event>;
     static_assert(std::is_same_v<typename Route::Context, MainLoop>
-      && std::is_same_v<typename Route::Delivery, Elide>,
+      && (std::is_same_v<typename Route::Delivery, Elide>
+        || std::is_same_v<typename Route::Delivery, Stream>),
       "GREVIR_EVENT_DEFERRED_ROUTE_NOT_IMPLEMENTED");
     typename Board::EventLock lock{};
     if (!ready_) { return PostResult::not_ready; }
-    if (Pending<Spec, Event>::value) { return PostResult::coalesced; }
+    if constexpr (std::is_same_v<typename Route::Delivery, Elide>) {
+      if (Pending<Spec, Event>::value) { return PostResult::coalesced; }
+    }
     if (count_ == capacity) {
       overrun_ = true;
       return PostResult::full;
     }
     const auto tail = static_cast<index_type>((head_ + count_) % capacity);
-    records_[tail] = {&invoke<Event>, &Pending<Spec, Event>::value};
-    Pending<Spec, Event>::value = true;
+    if constexpr (std::is_same_v<typename Route::Delivery, Elide>) {
+      records_[tail] = {&invoke<Event>, &Pending<Spec, Event>::value};
+      Pending<Spec, Event>::value = true;
+    } else {
+      records_[tail] = {&invoke<Event>, nullptr};
+    }
     ++count_;
     return PostResult::queued;
   }
@@ -86,7 +93,9 @@ class MainLoopQueue {
         typename Board::EventLock lock{};
         if (!ready_ || count_ == 0) { break; }
         record = records_[head_];
-        *static_cast<bool*>(record.argument) = false;
+        if (record.argument != nullptr) {
+          *static_cast<bool*>(record.argument) = false;
+        }
         head_ = static_cast<index_type>((head_ + 1) % capacity);
         --count_;
       }
@@ -117,7 +126,9 @@ class MainLoopQueue {
   static void clear_records() noexcept {
     for (index_type i = 0; i < count_; ++i) {
       const auto index = static_cast<index_type>((head_ + i) % capacity);
-      *static_cast<bool*>(records_[index].argument) = false;
+      if (records_[index].argument != nullptr) {
+        *static_cast<bool*>(records_[index].argument) = false;
+      }
     }
   }
 
