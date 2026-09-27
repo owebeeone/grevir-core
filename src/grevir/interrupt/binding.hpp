@@ -149,4 +149,42 @@ struct BindingPlan {
   static_assert(error == PlanError::none, "GREVIR_IRQ_BINDING_PLAN_INVALID");
 };
 
+// The selected deferred context is part of the same compile-time plan as its
+// event bindings. Direct-only applications do not require queue storage.
+template <class Spec>
+struct DeferredContextPlan {
+  using Board = typename Spec::Board;
+  inline static constexpr auto demands = DemandSet<Spec>::value;
+  inline static constexpr bool selected = [] {
+    for (std::size_t i = 0; i < demands.count; ++i) {
+      if (demands.contexts[i] == literal("main_loop")) { return true; }
+    }
+    return false;
+  }();
+  inline static constexpr bool available = requires {
+    Board::event_queue_capacity;
+    typename Board::EventLock;
+    Board::EventLock::identity;
+  };
+  static_assert(!selected || available, "GREVIR_EVENT_CONTEXT_UNAVAILABLE");
+  inline static constexpr unsigned capacity = [] {
+    if constexpr (selected && available) {
+      return static_cast<unsigned>(Board::event_queue_capacity);
+    } else {
+      return 0u;
+    }
+  }();
+  inline static constexpr std::string_view policy = [] {
+    if constexpr (selected && available) {
+      return std::string_view{Board::EventLock::identity};
+    } else {
+      return std::string_view{};
+    }
+  }();
+  static_assert(!selected || (capacity > 0 && capacity <= 255),
+    "GREVIR_EVENT_CAPACITY_OUT_OF_RANGE");
+  static_assert(!selected || valid_component(policy),
+    "GREVIR_EVENT_POLICY_ID_INVALID");
+};
+
 } // namespace grevir::interrupt

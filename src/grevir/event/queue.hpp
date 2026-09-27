@@ -71,6 +71,12 @@ class MainLoopQueue {
   }
 
   static std::size_t dispatch(std::size_t budget) noexcept {
+    if (budget == 0) { return 0; }
+    {
+      typename Board::EventLock lock{};
+      if (!ready_ || dispatching_) { return 0; }
+      dispatching_ = true;
+    }
     std::size_t handled = 0;
     while (handled < budget) {
       DispatchRecord record{};
@@ -84,6 +90,10 @@ class MainLoopQueue {
       }
       record.invoke(record.argument);
       ++handled;
+    }
+    {
+      typename Board::EventLock lock{};
+      dispatching_ = false;
     }
     return handled;
   }
@@ -114,6 +124,7 @@ class MainLoopQueue {
   inline static std::uint8_t count_ = 0;
   inline static bool ready_ = false;
   inline static bool overrun_ = false;
+  inline static bool dispatching_ = false;
 };
 
 } // namespace detail

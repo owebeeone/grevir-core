@@ -23,17 +23,31 @@ using App = grevir::ApplicationSpec<Board, Owner>;
 inline std::vector<char> seen{};
 inline bool rearm_a = false;
 inline grevir::event::PostResult rearm_result{};
+inline bool try_nested_dispatch = false;
+inline std::size_t nested_dispatch_count = 0;
+inline unsigned callback_depth = 0;
+inline unsigned maximum_callback_depth = 0;
 
 } // namespace event_queue_test
 
 template <>
 inline void grevir::on_event<event_queue_test::A>() noexcept {
+  ++event_queue_test::callback_depth;
+  if (event_queue_test::callback_depth > event_queue_test::maximum_callback_depth) {
+    event_queue_test::maximum_callback_depth = event_queue_test::callback_depth;
+  }
   event_queue_test::seen.push_back('a');
   if (event_queue_test::rearm_a) {
     event_queue_test::rearm_a = false;
     event_queue_test::rearm_result =
       grevir::event::post<event_queue_test::App, event_queue_test::A>();
   }
+  if (event_queue_test::try_nested_dispatch) {
+    event_queue_test::try_nested_dispatch = false;
+    event_queue_test::nested_dispatch_count =
+      grevir::event::dispatch<event_queue_test::App>(1);
+  }
+  --event_queue_test::callback_depth;
 }
 
 template <>
@@ -73,4 +87,25 @@ TEST_CASE("main-loop events elide and preserve bounded queue order", "[core][eve
   REQUIRE_FALSE(grevir::event::overrun<App>());
   grevir::event::stop<App>();
   REQUIRE(grevir::event::post<App, A>() == PostResult::not_ready);
+}
+
+TEST_CASE("main-loop dispatch does not nest callbacks", "[core][event]") {
+  using namespace event_queue_test;
+  using grevir::event::PostResult;
+  grevir::event::stop<App>();
+  seen.clear();
+  callback_depth = 0;
+  maximum_callback_depth = 0;
+  nested_dispatch_count = 99;
+  rearm_a = true;
+  try_nested_dispatch = true;
+  grevir::event::prepare<App>();
+  REQUIRE(grevir::event::post<App, A>() == PostResult::queued);
+  REQUIRE(grevir::event::dispatch<App>(1) == 1);
+  REQUIRE(nested_dispatch_count == 0);
+  REQUIRE(maximum_callback_depth == 1);
+  REQUIRE(seen == std::vector<char>{'a'});
+  REQUIRE(grevir::event::dispatch<App>(1) == 1);
+  REQUIRE(seen == std::vector<char>{'a', 'a'});
+  grevir::event::stop<App>();
 }

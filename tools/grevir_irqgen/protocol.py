@@ -11,7 +11,7 @@ class PlanError(ValueError):
     """A probe record or canonical plan violates the interrupt contract."""
 
 
-SCHEMA = 2
+SCHEMA = 3
 BACKENDS = {"mock", "avr", "esp32"}
 TEXT_FIELDS = ("owner", "configuration", "source", "selector", "entry", "snapshot_policy",
                "acknowledge_policy")
@@ -64,7 +64,7 @@ def _key(event: dict[str, str]) -> tuple[str, str, str]:
 def _validate_plan(plan: dict) -> dict:
     if type(plan) is not dict or set(plan) != {
         "schema", "backend", "target", "board", "compiler", "application",
-        "demands", "bindings", "source_groups", "fingerprint"
+        "deferred_context", "demands", "bindings", "source_groups", "fingerprint"
     }:
         raise PlanError("invalid interrupt plan fields")
     if plan["schema"] != SCHEMA or type(plan["schema"]) is not int:
@@ -99,6 +99,19 @@ def _validate_plan(plan: dict) -> dict:
         demand_keys.append(_key(event))
     if demand_keys != sorted(set(demand_keys)):
         raise PlanError("interrupt demands are duplicated or unordered")
+    context = plan["deferred_context"]
+    if type(context) is not dict or set(context) != {"capacity", "policy"}:
+        raise PlanError("invalid deferred context")
+    capacity = context["capacity"]
+    policy = context["policy"]
+    deferred = any(demand["context"] == "main_loop" for demand in demands)
+    if type(capacity) is not int or type(policy) is not str:
+        raise PlanError("invalid deferred context fields")
+    if deferred:
+        if not 1 <= capacity <= 255 or not _identifier(policy):
+            raise PlanError("invalid active deferred context")
+    elif capacity != 0 or policy != "":
+        raise PlanError("unselected deferred context has storage")
     binding_keys: list[tuple[str, str, str]] = []
     groups: dict[str, dict] = {}
     entries: dict[str, str] = {}
@@ -177,6 +190,7 @@ def decode(data: bytes) -> dict:
     binding_count = reader.word()
     header = {field: reader.text() for field in
               ("backend", "target", "board", "compiler", "application")}
+    context = {"capacity": reader.byte(), "policy": reader.text()}
     demands = [{"event": _event(reader), "handler": reader.text(),
                 "context": reader.text(), "delivery": reader.text()}
                for _ in range(demand_count)]
@@ -214,7 +228,8 @@ def decode(data: bytes) -> dict:
     for group in source_groups:
         group["events"].sort(key=lambda item: (item["dispatch_order"],
                                                 _key(item["event"])))
-    plan = {"schema": schema, **header, "demands": demands,
+    plan = {"schema": schema, **header, "deferred_context": context,
+            "demands": demands,
             "bindings": bindings, "source_groups": source_groups}
     plan["fingerprint"] = hashlib.sha256(_json(plan)).hexdigest()
     return _validate_plan(plan)
