@@ -21,6 +21,22 @@ template <typename Claim> struct ClaimParameter {
   static void runLoop() {}
 };
 
+template <typename Allocation, typename Requests> struct SelectedTimerParameter;
+template <typename Allocation>
+struct SelectedTimerParameter<Allocation, setl::TypeArgs<>> {
+  using Claims = ardo::ResourceClaim<>;
+  static void runSetup() {}
+  static void runLoop() {}
+};
+template <typename Allocation, typename First, typename... Rest>
+struct SelectedTimerParameter<Allocation, setl::TypeArgs<First, Rest...>> {
+  static_assert(((First::name.view() == Rest::name.view()) && ...),
+    "GREVIR_MODULE_MUST_DECLARE_ONE_TIMER_OWNER");
+  using Claims = typename Allocation::template OwnerClaims<First::name>;
+  static void runSetup() { Allocation::template setup_owner<First::name>(); }
+  static void runLoop() {}
+};
+
 } // namespace nfp
 
 // Static requirements and fixed claims are available before driver binding.
@@ -36,7 +52,10 @@ struct RequestedModule {
     using Impl = Module<Allocation>;
     using Deps = typename Impl::Deps::template cat<typename Dependencies::template Bind<Allocation>...>;
     using Params = typename Impl::Params::Params
-      ::template cat<nfp::ClaimParameter<Claims>>::template eval<ardo::Parameters>;
+      ::template cat<nfp::ClaimParameter<Claims>,
+        nfp::SelectedTimerParameter<Allocation, Requests>>::template eval<ardo::Parameters>;
+    static void paramsSetup() { Params::ParamsRunner::runSetup(); }
+    static void paramsLoop() { Params::ParamsRunner::runLoop(); }
   };
 };
 
@@ -57,12 +76,9 @@ struct Assemble {
   using Claims = typename Join<typename Descriptors::Claims::Resources...>::type;
   using Allocation = typename Backend::template Allocate<Requests,Claims>;
   static_assert(Allocation::plan.ok(), "GREVIR_APPLICATION_ALLOCATION_FAILED");
-  struct Owner : ardo::ModuleBase<ardo::Parameters<ClaimParameter<typename Allocation::Claims>>> {};
-  using Modules = ardo::Application<Owner,typename Descriptors::template Bind<Allocation>...>;
+  using Modules = ardo::Application<typename Descriptors::template Bind<Allocation>...>;
   static_assert(!Modules::has_conflict, "GREVIR_APPLICATION_RESOURCE_CONFLICT");
   static void runSetup() {
-    // Register setup precedes every parameter and module setup callback.
-    Allocation::setup();
     Modules::runSetup();
   }
   static void runLoop() { Modules::runLoop(); }
