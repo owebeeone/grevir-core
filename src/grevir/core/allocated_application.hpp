@@ -48,14 +48,17 @@ struct RequestedModule {
   using Claims = Claims_;
   using Deps = setl::TypeArgs<Dependencies...>;
   template <typename Allocation>
-  struct Bind : Module<Allocation> {
-    using Impl = Module<Allocation>;
+  struct Bind : Module<typename Allocation::template View<Requests>> {
+    using Impl = Module<typename Allocation::template View<Requests>>;
     using Deps = typename Impl::Deps::template cat<typename Dependencies::template Bind<Allocation>...>;
     using Params = typename Impl::Params::Params
       ::template cat<nfp::ClaimParameter<Claims>,
         nfp::SelectedTimerParameter<Allocation, Requests>>::template eval<ardo::Parameters>;
-    static void paramsSetup() { Params::ParamsRunner::runSetup(); }
-    static void paramsLoop() { Params::ParamsRunner::runLoop(); }
+    static void paramsSetup() {
+      nfp::SelectedTimerParameter<Allocation, Requests>::runSetup();
+      Impl::paramsSetup();
+    }
+    static void paramsLoop() { Impl::paramsLoop(); }
   };
 };
 
@@ -79,7 +82,7 @@ struct Assemble {
   using Modules = ardo::Application<typename Descriptors::template Bind<Allocation>...>;
   static_assert(!Modules::has_conflict, "GREVIR_APPLICATION_RESOURCE_CONFLICT");
   static void runSetup() {
-    Modules::runSetup();
+    Modules::ModuleRunner::runSetupInterleaved();
   }
   static void runLoop() { Modules::runLoop(); }
 };

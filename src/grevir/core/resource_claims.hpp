@@ -20,6 +20,13 @@ public:
   static constexpr unsigned PIN = P;
 };
 
+// Board adapters may specialize this mapping before application composition.
+// Generic MCU GPIO identities remain unchanged by default.
+template <unsigned P>
+struct CanonicalGPIO {
+  static constexpr unsigned value = P;
+};
+
 /**
  * For serial port resource claims. 
  */
@@ -77,6 +84,10 @@ struct range_claim {
 
 template<typename T, typename U>
 struct has_conflict : std::is_same<T, U> {};
+
+template <unsigned A, unsigned B>
+struct has_conflict<GPIOResource<A>, GPIOResource<B>>
+  : std::bool_constant<CanonicalGPIO<A>::value == CanonicalGPIO<B>::value> {};
 
 template<typename T, int Begin1, int End1, int Begin2, int End2>
 struct has_conflict<range_claim<T, Begin1, End1>, range_claim<T, Begin2, End2>> {

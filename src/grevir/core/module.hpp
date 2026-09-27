@@ -35,6 +35,12 @@ public:
     S::runSetup();
   }
 
+  inline static void runSetupInterleaved() {
+    Runner<T...>::runSetupInterleaved();
+    S::paramsSetup();
+    S::runSetup();
+  }
+
   inline static void runLoop() {
     Runner<T...>::runLoop();
     S::runLoop();
@@ -51,6 +57,9 @@ public:
   }
 
   inline static void runSetup() {
+  }
+
+  inline static void runSetupInterleaved() {
   }
 
   inline static void runLoop() {
