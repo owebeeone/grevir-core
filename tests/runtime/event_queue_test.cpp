@@ -2,6 +2,8 @@
 #include <grevir/event/queue.hpp>
 #include <grevir/test/event_lock.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <atomic>
+#include <thread>
 #include <vector>
 
 namespace event_queue_test {
@@ -15,8 +17,19 @@ struct Request { using InterruptEvents = setl::TypeArgs<A, B, C, S>; };
 template <class>
 struct Module : ardo::ModuleBase<ardo::Parameters<>> {};
 using Owner = grevir::RequestedModule<setl::TypeArgs<Request>, Module>;
+struct MainLoopContext {
+  inline static thread_local unsigned char token = 0;
+  inline static std::atomic<const void*> owner{nullptr};
+  static void bind() noexcept {
+    owner.store(&token, std::memory_order_release);
+  }
+  static bool is_current() noexcept {
+    return owner.load(std::memory_order_acquire) == &token;
+  }
+};
 struct Board {
   using EventLock = grevir::test::EventLock;
+  using MainLoopContext = event_queue_test::MainLoopContext;
   inline static constexpr unsigned event_queue_capacity = 2;
 };
 using App = grevir::ApplicationSpec<Board, Owner>;
@@ -148,5 +161,55 @@ TEST_CASE("stream retains each accepted firing and recovers after overflow", "[c
   REQUIRE(grevir::event::post<App, A>() == PostResult::coalesced);
   REQUIRE(grevir::event::dispatch<App>(2) == 2);
   REQUIRE(seen == std::vector<char>{'s', 's', 's', 'a', 's'});
+  grevir::event::stop<App>();
+}
+
+TEST_CASE("main-loop callbacks stay on the task that prepared the queue", "[core][event]") {
+  using namespace event_queue_test;
+  grevir::event::stop<App>();
+  seen.clear();
+  grevir::event::prepare<App>();
+  REQUIRE(grevir::event::post<App, A>() == grevir::event::PostResult::queued);
+  std::size_t foreign_dispatch = 99;
+  grevir::event::PostResult foreign_post = grevir::event::PostResult::not_ready;
+  std::thread foreign([&] {
+    foreign_post = grevir::event::post<App, B>();
+    foreign_dispatch = grevir::event::dispatch<App>(1);
+  });
+  foreign.join();
+  REQUIRE(foreign_post == grevir::event::PostResult::queued);
+  REQUIRE(foreign_dispatch == 0);
+  REQUIRE(seen.empty());
+  REQUIRE(grevir::event::dispatch<App>(2) == 2);
+  REQUIRE(seen == std::vector<char>{'a', 'b'});
+  grevir::event::stop<App>();
+}
+
+TEST_CASE("concurrent ISR publications keep the bounded Stream queue consistent", "[core][event]") {
+  using namespace event_queue_test;
+  grevir::event::stop<App>();
+  seen.clear();
+  grevir::event::prepare<App>();
+  std::atomic<unsigned> queued{0};
+  std::atomic<unsigned> full{0};
+  auto publish = [&] {
+    for (unsigned i = 0; i < 100; ++i) {
+      const auto result = grevir::event::post_from_isr<App, S>();
+      if (result == grevir::event::PostResult::queued) {
+        queued.fetch_add(1, std::memory_order_relaxed);
+      } else if (result == grevir::event::PostResult::full) {
+        full.fetch_add(1, std::memory_order_relaxed);
+      }
+    }
+  };
+  std::thread first(publish);
+  std::thread second(publish);
+  first.join();
+  second.join();
+  REQUIRE(queued.load() == 2);
+  REQUIRE(full.load() == 198);
+  REQUIRE(grevir::event::overrun<App>());
+  REQUIRE(grevir::event::dispatch<App>(2) == 2);
+  REQUIRE(seen == std::vector<char>{'s', 's'});
   grevir::event::stop<App>();
 }

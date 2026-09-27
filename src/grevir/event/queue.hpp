@@ -33,7 +33,10 @@ class MainLoopQueue {
 
  public:
   static void prepare() noexcept {
-    typename Board::EventLock lock{};
+    if constexpr (requires { typename Board::MainLoopContext; }) {
+      Board::MainLoopContext::bind();
+    }
+    typename Board::EventLock::TaskGuard lock{};
     clear_records();
     head_ = 0;
     count_ = 0;
@@ -42,7 +45,7 @@ class MainLoopQueue {
   }
 
   static void stop() noexcept {
-    typename Board::EventLock lock{};
+    typename Board::EventLock::TaskGuard lock{};
     ready_ = false;
     clear_records();
     head_ = 0;
@@ -51,6 +54,60 @@ class MainLoopQueue {
 
   template <class Event>
   static PostResult post() noexcept {
+    return post_with_guard<Event, typename Board::EventLock::TaskGuard>();
+  }
+
+  template <class Event>
+  static PostResult post_from_isr() noexcept {
+    return post_with_guard<Event, typename Board::EventLock::IsrGuard>();
+  }
+
+  static std::size_t dispatch(std::size_t budget) noexcept {
+    if (budget == 0) { return 0; }
+    if constexpr (requires { typename Board::MainLoopContext; }) {
+      if (!Board::MainLoopContext::is_current()) { return 0; }
+    }
+    {
+      typename Board::EventLock::TaskGuard lock{};
+      if (!ready_ || dispatching_) { return 0; }
+      dispatching_ = true;
+    }
+    std::size_t handled = 0;
+    while (handled < budget) {
+      DispatchRecord record{};
+      {
+        typename Board::EventLock::TaskGuard lock{};
+        if (!ready_ || count_ == 0) { break; }
+        record = records_[head_];
+        if (record.argument != nullptr) {
+          *static_cast<bool*>(record.argument) = false;
+        }
+        head_ = static_cast<index_type>((head_ + 1) % capacity);
+        --count_;
+      }
+      record.invoke(record.argument);
+      ++handled;
+    }
+    {
+      typename Board::EventLock::TaskGuard lock{};
+      dispatching_ = false;
+    }
+    return handled;
+  }
+
+  static bool overrun() noexcept {
+    typename Board::EventLock::TaskGuard lock{};
+    return overrun_;
+  }
+
+  static void clear_overrun() noexcept {
+    typename Board::EventLock::TaskGuard lock{};
+    overrun_ = false;
+  }
+
+ private:
+  template <class Event, class Guard>
+  static PostResult post_with_guard() noexcept {
     static_assert(std::is_same_v<Event,
       typename interrupt::EventCatalog<Spec>::template ByKey<typename Event::Key>>,
       "GREVIR_EVENT_NOT_IN_APPLICATION");
@@ -59,7 +116,7 @@ class MainLoopQueue {
       && (std::is_same_v<typename Route::Delivery, Elide>
         || std::is_same_v<typename Route::Delivery, Stream>),
       "GREVIR_EVENT_DEFERRED_ROUTE_NOT_IMPLEMENTED");
-    typename Board::EventLock lock{};
+    Guard lock{};
     if (!ready_) { return PostResult::not_ready; }
     if constexpr (std::is_same_v<typename Route::Delivery, Elide>) {
       if (Pending<Spec, Event>::value) { return PostResult::coalesced; }
@@ -79,47 +136,6 @@ class MainLoopQueue {
     return PostResult::queued;
   }
 
-  static std::size_t dispatch(std::size_t budget) noexcept {
-    if (budget == 0) { return 0; }
-    {
-      typename Board::EventLock lock{};
-      if (!ready_ || dispatching_) { return 0; }
-      dispatching_ = true;
-    }
-    std::size_t handled = 0;
-    while (handled < budget) {
-      DispatchRecord record{};
-      {
-        typename Board::EventLock lock{};
-        if (!ready_ || count_ == 0) { break; }
-        record = records_[head_];
-        if (record.argument != nullptr) {
-          *static_cast<bool*>(record.argument) = false;
-        }
-        head_ = static_cast<index_type>((head_ + 1) % capacity);
-        --count_;
-      }
-      record.invoke(record.argument);
-      ++handled;
-    }
-    {
-      typename Board::EventLock lock{};
-      dispatching_ = false;
-    }
-    return handled;
-  }
-
-  static bool overrun() noexcept {
-    typename Board::EventLock lock{};
-    return overrun_;
-  }
-
-  static void clear_overrun() noexcept {
-    typename Board::EventLock lock{};
-    overrun_ = false;
-  }
-
- private:
   template <class Event>
   static void invoke(void*) noexcept { grevir::on_event<Event>(); }
 
@@ -153,7 +169,7 @@ PostResult post() noexcept { return detail::MainLoopQueue<Spec>::template post<E
 
 template <class Spec, class Event>
 PostResult post_from_isr() noexcept {
-  return detail::MainLoopQueue<Spec>::template post<Event>();
+  return detail::MainLoopQueue<Spec>::template post_from_isr<Event>();
 }
 
 template <class Spec>
