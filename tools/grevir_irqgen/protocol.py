@@ -11,7 +11,7 @@ class PlanError(ValueError):
     """A probe record or canonical plan violates the interrupt contract."""
 
 
-SCHEMA = 3
+SCHEMA = 4
 BACKENDS = {"mock", "avr", "esp32"}
 TEXT_FIELDS = ("owner", "configuration", "source", "selector", "entry", "snapshot_policy",
                "acknowledge_policy")
@@ -108,7 +108,7 @@ def _validate_plan(plan: dict) -> dict:
     if type(capacity) is not int or type(policy) is not str:
         raise PlanError("invalid deferred context fields")
     if deferred:
-        if not 1 <= capacity <= 255 or not _identifier(policy):
+        if not 1 <= capacity <= 2048 or not _identifier(policy):
             raise PlanError("invalid active deferred context")
     elif capacity != 0 or policy != "":
         raise PlanError("unselected deferred context has storage")
@@ -190,7 +190,7 @@ def decode(data: bytes) -> dict:
     binding_count = reader.word()
     header = {field: reader.text() for field in
               ("backend", "target", "board", "compiler", "application")}
-    context = {"capacity": reader.byte(), "policy": reader.text()}
+    context = {"capacity": reader.word(), "policy": reader.text()}
     demands = [{"event": _event(reader), "handler": reader.text(),
                 "context": reader.text(), "delivery": reader.text()}
                for _ in range(demand_count)]

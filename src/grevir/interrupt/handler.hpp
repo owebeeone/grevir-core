@@ -25,7 +25,19 @@ namespace grevir::interrupt::detail {
 
 template <class Event>
 struct HandlerChoice {
+#if defined(GREVIR_IRQ_PROBE)
   inline static constexpr bool raw = requires { grevir::on_interrupt<Event>(); };
+#else
+  inline static constexpr bool raw = [] {
+    if constexpr (requires {
+      typename BoundEventKey<typename Event::Key>::Event;
+    }) {
+      return requires { grevir::on_interrupt<Event>(); };
+    } else {
+      return false;
+    }
+  }();
+#endif
   inline static constexpr bool event = requires { grevir::on_event<Event>(); };
   static_assert(!(raw && event), "GREVIR_IRQ_DUPLICATE_HANDLER");
   using Context = typename grevir::event::RouteFor<Event>::Context;

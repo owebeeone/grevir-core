@@ -25,7 +25,7 @@ consteval std::size_t probe_record_size() {
   size += encoded_text_size(Spec::Board::board);
   size += encoded_text_size(Spec::Board::compiler);
   size += encoded_text_size(Spec::Board::application);
-  size += 1 + encoded_text_size(DeferredContextPlan<Spec>::policy);
+  size += 2 + encoded_text_size(DeferredContextPlan<Spec>::policy);
   for (std::size_t i = 0; i < demands.count; ++i) {
     const auto& event = demands.keys[i];
     size += encoded_text_size(event.instance) + encoded_text_size(event.request)
@@ -77,7 +77,7 @@ consteval auto encode_probe_record() {
     for (char character : value) { byte(static_cast<unsigned char>(character)); }
   };
   byte('G'); byte('I'); byte('R'); byte('Q');
-  word(3); dword(static_cast<unsigned long>(length));
+  word(4); dword(static_cast<unsigned long>(length));
   word(static_cast<unsigned>(demands.count));
   word(static_cast<unsigned>(selected.count));
   string(Spec::Board::backend);
@@ -85,7 +85,7 @@ consteval auto encode_probe_record() {
   string(Spec::Board::board);
   string(Spec::Board::compiler);
   string(Spec::Board::application);
-  byte(DeferredContextPlan<Spec>::capacity);
+  word(DeferredContextPlan<Spec>::capacity);
   string(DeferredContextPlan<Spec>::policy);
   for (std::size_t i = 0; i < demands.count; ++i) {
     const auto& event = demands.keys[i];

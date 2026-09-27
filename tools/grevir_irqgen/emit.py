@@ -7,7 +7,7 @@ import hashlib
 from protocol import PlanError
 
 
-EMITTER = "grevir_irqgen_3"
+EMITTER = "grevir_irqgen_4"
 
 
 def _event_type(event: dict[str, str]) -> str:
@@ -104,6 +104,8 @@ def emit(plan: dict, application_header: str) -> tuple[bytes, bytes]:
         f'#include "{application_header}"',
         "#include <grevir/interrupt/install.hpp>",
         "#include <grevir/interrupt/binding.hpp>",
+        "#include <grevir/interrupt/demand.hpp>",
+        'static_assert(::grevir::interrupt::same_demands(::grevir::interrupt::LiveDemandSet<::GrevirApplication>::value, ::grevir::interrupt::DemandSet<::GrevirApplication>::value), "GREVIR_IRQ_STALE_DEMAND_SET");',
         f'static_assert(::grevir::interrupt::literal(::grevir::interrupt::detail::emission_fingerprint) == ::grevir::interrupt::literal("{fingerprint}"));',
         'static_assert(::grevir::interrupt::DeferredContextPlan<::GrevirApplication>::capacity == ::grevir::interrupt::detail::emitted_event_queue_capacity, "GREVIR_IRQ_STALE_EVENT_CONTEXT_CAPACITY");',
         'static_assert(::grevir::interrupt::DeferredContextPlan<::GrevirApplication>::policy == ::grevir::interrupt::detail::emitted_event_queue_policy, "GREVIR_IRQ_STALE_EVENT_CONTEXT_POLICY");',

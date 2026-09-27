@@ -1,6 +1,7 @@
 #pragma once
 
 #include <grevir/interrupt/catalog.hpp>
+#include <grevir/event/queue_capacity.hpp>
 #if defined(GREVIR_IRQ_PROBE)
 #include <grevir/interrupt/demand.hpp>
 #endif
@@ -167,13 +168,8 @@ struct DeferredContextPlan {
     Board::EventLock::identity;
   };
   static_assert(!selected || available, "GREVIR_EVENT_CONTEXT_UNAVAILABLE");
-  inline static constexpr unsigned capacity = [] {
-    if constexpr (selected && available) {
-      return static_cast<unsigned>(Board::event_queue_capacity);
-    } else {
-      return 0u;
-    }
-  }();
+  inline static constexpr unsigned capacity =
+    event::detail::SelectedQueueCapacity<Board, selected && available>::value;
   inline static constexpr std::string_view policy = [] {
     if constexpr (selected && available) {
       return std::string_view{Board::EventLock::identity};
@@ -181,8 +177,6 @@ struct DeferredContextPlan {
       return std::string_view{};
     }
   }();
-  static_assert(!selected || (capacity > 0 && capacity <= 255),
-    "GREVIR_EVENT_CAPACITY_OUT_OF_RANGE");
   static_assert(!selected || valid_component(policy),
     "GREVIR_EVENT_POLICY_ID_INVALID");
 };

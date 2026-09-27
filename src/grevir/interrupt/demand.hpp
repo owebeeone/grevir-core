@@ -3,7 +3,6 @@
 #include <grevir/interrupt/catalog.hpp>
 #include <grevir/interrupt/handler.hpp>
 
-#if defined(GREVIR_IRQ_PROBE)
 namespace grevir::interrupt {
 
 namespace detail {
@@ -60,11 +59,30 @@ struct DemandData {
 } // namespace detail
 
 template <class Spec>
-struct DemandSet {
+struct LiveDemandSet {
   using Catalog = EventCatalog<Spec>;
   using Data = typename Catalog::Events::template eval<detail::DemandData>;
   inline static constexpr auto value = Data::value;
 };
 
-} // namespace grevir::interrupt
+template <std::size_t LiveCapacity, std::size_t RecordedCapacity>
+constexpr bool same_demands(const DemandSummary<LiveCapacity>& live,
+    const DemandSummary<RecordedCapacity>& recorded) {
+  if (live.count != recorded.count) { return false; }
+  for (std::size_t i = 0; i < live.count; ++i) {
+    if (live.keys[i] != recorded.keys[i]
+        || live.handlers[i] != recorded.handlers[i]
+        || live.contexts[i] != recorded.contexts[i]
+        || live.deliveries[i] != recorded.deliveries[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+#if defined(GREVIR_IRQ_PROBE)
+template <class Spec>
+struct DemandSet : LiveDemandSet<Spec> {};
 #endif
+
+} // namespace grevir::interrupt

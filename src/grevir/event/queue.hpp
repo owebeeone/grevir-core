@@ -1,7 +1,9 @@
 #pragma once
 
 #include <grevir/event/route.hpp>
+#include <grevir/event/queue_capacity.hpp>
 #include <grevir/interrupt/catalog.hpp>
+#include <grevir/base/type_for_size.hpp>
 #include <grevir/base/compat/cstddef.hpp>
 #include <grevir/base/compat/cstdint.hpp>
 #include <grevir/base/compat/type_traits.hpp>
@@ -25,9 +27,9 @@ struct Pending {
 template <class Spec>
 class MainLoopQueue {
   using Board = typename Spec::Board;
-  static constexpr std::size_t capacity = Board::event_queue_capacity;
-  static_assert(capacity > 0 && capacity <= 255,
-    "GREVIR_EVENT_CAPACITY_OUT_OF_RANGE");
+  static constexpr std::size_t capacity = QueueCapacity<Board>::value;
+  using index_type = typename setl::TypeForMaxValue<
+    static_cast<std::uint32_t>(capacity)>::selected::type_unsigned;
 
  public:
   static void prepare() noexcept {
@@ -63,7 +65,7 @@ class MainLoopQueue {
       overrun_ = true;
       return PostResult::full;
     }
-    const auto tail = static_cast<std::uint8_t>((head_ + count_) % capacity);
+    const auto tail = static_cast<index_type>((head_ + count_) % capacity);
     records_[tail] = {&invoke<Event>, &Pending<Spec, Event>::value};
     Pending<Spec, Event>::value = true;
     ++count_;
@@ -85,7 +87,7 @@ class MainLoopQueue {
         if (!ready_ || count_ == 0) { break; }
         record = records_[head_];
         *static_cast<bool*>(record.argument) = false;
-        head_ = static_cast<std::uint8_t>((head_ + 1) % capacity);
+        head_ = static_cast<index_type>((head_ + 1) % capacity);
         --count_;
       }
       record.invoke(record.argument);
@@ -113,15 +115,15 @@ class MainLoopQueue {
   static void invoke(void*) noexcept { grevir::on_event<Event>(); }
 
   static void clear_records() noexcept {
-    for (std::uint8_t i = 0; i < count_; ++i) {
-      const auto index = static_cast<std::uint8_t>((head_ + i) % capacity);
+    for (index_type i = 0; i < count_; ++i) {
+      const auto index = static_cast<index_type>((head_ + i) % capacity);
       *static_cast<bool*>(records_[index].argument) = false;
     }
   }
 
   inline static DispatchRecord records_[capacity]{};
-  inline static std::uint8_t head_ = 0;
-  inline static std::uint8_t count_ = 0;
+  inline static index_type head_ = 0;
+  inline static index_type count_ = 0;
   inline static bool ready_ = false;
   inline static bool overrun_ = false;
   inline static bool dispatching_ = false;
