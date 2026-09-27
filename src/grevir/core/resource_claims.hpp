@@ -87,7 +87,8 @@ struct has_conflict : std::is_same<T, U> {};
 
 template <unsigned A, unsigned B>
 struct has_conflict<GPIOResource<A>, GPIOResource<B>>
-  : std::bool_constant<CanonicalGPIO<A>::value == CanonicalGPIO<B>::value> {};
+  : std::integral_constant<bool,
+      CanonicalGPIO<A>::value == CanonicalGPIO<B>::value> {};
 
 template<typename T, int Begin1, int End1, int Begin2, int End2>
 struct has_conflict<range_claim<T, Begin1, End1>, range_claim<T, Begin2, End2>> {

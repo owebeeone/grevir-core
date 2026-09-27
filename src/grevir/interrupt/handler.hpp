@@ -2,6 +2,7 @@
 
 #include <grevir/base/compat/type_traits.hpp>
 #include <grevir/base/compat/string_view.hpp>
+#include <grevir/event/queue.hpp>
 
 namespace grevir::interrupt::detail {
 
@@ -12,26 +13,7 @@ struct BindingGate;
 
 } // namespace grevir::interrupt::detail
 
-namespace grevir::event {
-
-struct MainLoop {};
-struct IsrLevel {};
-struct Elide {};
-struct Stream {};
-struct Direct {};
-
-template <class Event>
-struct RouteFor {
-  using Context = MainLoop;
-  using Delivery = Elide;
-};
-
-} // namespace grevir::event
-
 namespace grevir {
-
-template <class Event>
-void on_event() noexcept = delete;
 
 template <class Event, class Gate = interrupt::detail::BindingGate<Event>,
           unsigned = Gate::id>
@@ -109,7 +91,16 @@ void dispatch_bound_interrupt() noexcept {
   } else if constexpr (Choice::event && Choice::is_direct) {
     grevir::on_event<Event>();
   } else {
-    static_assert(!Choice::event, "GREVIR_IRQ_DEFERRED_BACKEND_NOT_IMPLEMENTED");
+    using Application = typename Binding::Application;
+    static_assert(Choice::is_deferred, "GREVIR_IRQ_INVALID_EVENT_ROUTE");
+    if constexpr (requires {
+      Application::Board::event_queue_capacity;
+      typename Application::Board::EventLock;
+    }) {
+      (void)grevir::event::post_from_isr<Application, Event>();
+    } else {
+      static_assert(!Choice::is_deferred, "GREVIR_EVENT_CONTEXT_UNAVAILABLE");
+    }
   }
 }
 

@@ -88,6 +88,7 @@ def emit(plan: dict, application_header: str) -> tuple[bytes, bytes]:
         header += [
             f"template <> struct BoundEventKey<{key}> {{",
             f"  using Event = typename EventCatalog<::GrevirApplication>::template ByKey<{key}>;",
+            "  using Application = ::GrevirApplication;",
             "  static_assert(!std::is_same_v<Event, void>, \"GREVIR_IRQ_EVENT_NOT_IN_CATALOG\");",
             f"  static constexpr unsigned id = {number}u;",
             f'  static constexpr std::string_view handler{{"{demand["handler"]}", {len(demand["handler"])}u}};',
