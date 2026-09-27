@@ -2,6 +2,9 @@
 #include <grevir/core/application.hpp>
 
 namespace grevir {
+template <typename Requests_, template <typename> typename Module,
+    typename Claims_, typename... Dependencies>
+struct RequestedModule;
 namespace nfp {
 
 template <typename... Lists> struct Join;
@@ -33,7 +36,12 @@ struct SelectedTimerParameter<Allocation, setl::TypeArgs<First, Rest...>> {
   static_assert(((First::name.view() == Rest::name.view()) && ...),
     "GREVIR_MODULE_MUST_DECLARE_ONE_TIMER_OWNER");
   using Claims = typename Allocation::template OwnerClaims<First::name>;
+private:
+  template <typename Requests_, template <typename> typename Module,
+    typename Claims_, typename... Dependencies>
+  friend struct ::grevir::RequestedModule;
   static void runSetup() { Allocation::template setup_owner<First::name>(); }
+public:
   static void runLoop() {}
 };
 
@@ -49,7 +57,9 @@ struct RequestedModule {
   using Deps = setl::TypeArgs<Dependencies...>;
   template <typename Allocation>
   struct Bind : Module<typename Allocation::template View<Requests>> {
+  private:
     using Impl = Module<typename Allocation::template View<Requests>>;
+  public:
     using Deps = typename Impl::Deps::template cat<typename Dependencies::template Bind<Allocation>...>;
     using Params = typename Impl::Params::Params
       ::template cat<nfp::ClaimParameter<Claims>,
@@ -75,11 +85,19 @@ struct ExistingModule {
 namespace nfp {
 template <typename Backend, typename... Descriptors>
 struct Assemble {
+private:
   using Requests = typename Join<typename Descriptors::Requests...>::type;
   using Claims = typename Join<typename Descriptors::Claims::Resources...>::type;
   using Allocation = typename Backend::template Allocate<Requests,Claims>;
+public:
+  inline static constexpr auto plan = Allocation::plan;
+  using SelectedClaims = typename Allocation::Claims;
+  template <auto Name>
+  using OwnerClaims = typename Allocation::template OwnerClaims<Name>;
   static_assert(Allocation::plan.ok(), "GREVIR_APPLICATION_ALLOCATION_FAILED");
+private:
   using Modules = ardo::Application<typename Descriptors::template Bind<Allocation>...>;
+public:
   static_assert(!Modules::has_conflict, "GREVIR_APPLICATION_RESOURCE_CONFLICT");
   static void runSetup() {
     Modules::ModuleRunner::runSetupInterleaved();
