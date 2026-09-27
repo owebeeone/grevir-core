@@ -43,6 +43,9 @@ template <std::size_t N>
 struct DemandSummary {
   FixedArray<EventIdentity, N> keys{};
   std::size_t count = 0;
+  FixedArray<std::string_view, N> handlers{};
+  FixedArray<std::string_view, N> contexts{};
+  FixedArray<std::string_view, N> deliveries{};
 };
 
 template <class Spec>

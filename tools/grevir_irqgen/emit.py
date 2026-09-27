@@ -7,7 +7,7 @@ import hashlib
 from protocol import PlanError
 
 
-EMITTER = "grevir_irqgen_1"
+EMITTER = "grevir_irqgen_2"
 
 
 def _event_type(event: dict[str, str]) -> str:
@@ -63,8 +63,12 @@ def emit(plan: dict, application_header: str) -> tuple[bytes, bytes]:
         "  inline static constexpr auto value = [] {",
         f"    DemandSummary<{len(plan['demands'])}> result{{}};",
     ]
-    for index, event in enumerate(plan["demands"]):
-        header.append(f"    result.keys[{index}] = identity<{_event_type(event)}>();")
+    for index, demand in enumerate(plan["demands"]):
+        header.append(f"    result.keys[{index}] = identity<{_event_type(demand['event'])}>();")
+        for field, member in (("handler", "handlers"), ("context", "contexts"),
+                              ("delivery", "deliveries")):
+            header.append(f'    result.{member}[{index}] = '
+                          f'std::string_view{{"{demand[field]}", {len(demand[field])}u}};')
     header += [
         f"    result.count = {len(plan['demands'])};",
         "    return result;",
@@ -74,13 +78,21 @@ def emit(plan: dict, application_header: str) -> tuple[bytes, bytes]:
         "namespace grevir::interrupt::detail {",
         f'inline constexpr char emission_fingerprint[] = "{fingerprint}";',
     ]
+    demand_by_key = {tuple(demand["event"][field] for field in
+                           ("instance", "request", "kind")): demand
+                     for demand in plan["demands"]}
     for number, binding in enumerate(plan["bindings"], start=1):
         key = _event_type(binding["event"])
+        demand = demand_by_key[tuple(binding["event"][field] for field in
+                                     ("instance", "request", "kind"))]
         header += [
             f"template <> struct BoundEventKey<{key}> {{",
             f"  using Event = typename EventCatalog<::GrevirApplication>::template ByKey<{key}>;",
             "  static_assert(!std::is_same_v<Event, void>, \"GREVIR_IRQ_EVENT_NOT_IN_CATALOG\");",
             f"  static constexpr unsigned id = {number}u;",
+            f'  static constexpr std::string_view handler{{"{demand["handler"]}", {len(demand["handler"])}u}};',
+            f'  static constexpr std::string_view context{{"{demand["context"]}", {len(demand["context"])}u}};',
+            f'  static constexpr std::string_view delivery{{"{demand["delivery"]}", {len(demand["delivery"])}u}};',
             "};",
         ]
     header += ["} // namespace grevir::interrupt::detail", ""]
@@ -124,7 +136,7 @@ def emit(plan: dict, application_header: str) -> tuple[bytes, bytes]:
         source.append(f'extern "C" {{ GREVIR_IRQ_GUARD_ATTR volatile unsigned char {guard} = 0; }}')
         item = group["events"][0]
         key = _event_type(item["event"])
-        call = ("  ::grevir::on_interrupt<"
+        call = ("  ::grevir::interrupt::detail::dispatch_bound_interrupt<"
                 "typename ::grevir::interrupt::EventCatalog<"
                 f"::GrevirApplication>::template ByKey<{key}>>();")
         if backend != "avr":

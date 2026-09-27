@@ -39,11 +39,6 @@ static_assert(std::is_same_v<Finder::Resource<PinB, graph::ResourceType::spi_bus
 static_assert(std::is_same_v<Finder::Resource<Device, graph::ResourceType::spi_bus>, void>);
 static_assert(std::is_same_v<Finder::Resource<PinA, graph::ResourceType::uart_rw>, void>);
 
-// This is only a pass-through placeholder, not an allocation solver.
-using Resolver = timers::nfp::SelectionResolver<PinA>;
-static_assert(std::is_same_v<Resolver::Resolve<Bus>, Bus>);
-static_assert(std::is_same_v<Resolver::Select<PinB>, Resolver>);
-
 using Claims = ConcatenateResourceClaims<ResourceClaim<GPIOResource<1>>,
   ResourceClaim<GPIOResource<2>>>;
 static_assert(Claims::has_resource<GPIOResource<1>>::value);

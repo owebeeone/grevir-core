@@ -11,7 +11,7 @@ class PlanError(ValueError):
     """A probe record or canonical plan violates the interrupt contract."""
 
 
-SCHEMA = 1
+SCHEMA = 2
 BACKENDS = {"mock", "avr", "esp32"}
 TEXT_FIELDS = ("owner", "configuration", "source", "selector", "entry", "snapshot_policy",
                "acknowledge_policy")
@@ -81,12 +81,21 @@ def _validate_plan(plan: dict) -> dict:
     if len(demands) != len(bindings):
         raise PlanError("interrupt demands and bindings differ")
     demand_keys: list[tuple[str, str, str]] = []
-    for event in demands:
+    for demand in demands:
+        if type(demand) is not dict or set(demand) != {
+                "event", "handler", "context", "delivery"}:
+            raise PlanError("invalid interrupt demand")
+        event = demand["event"]
         if type(event) is not dict or set(event) != {"instance", "request", "kind"}:
             raise PlanError("invalid interrupt event")
         if any(type(value) is not str or not _identifier(value)
                for value in event.values()):
             raise PlanError("invalid interrupt event key")
+        if (demand["handler"], demand["context"], demand["delivery"]) not in (
+                ("raw", "isr", "direct"), ("event", "isr", "direct"),
+                ("event", "main_loop", "elide"),
+                ("event", "main_loop", "stream")):
+            raise PlanError("invalid interrupt handler route")
         demand_keys.append(_key(event))
     if demand_keys != sorted(set(demand_keys)):
         raise PlanError("interrupt demands are duplicated or unordered")
@@ -168,7 +177,9 @@ def decode(data: bytes) -> dict:
     binding_count = reader.word()
     header = {field: reader.text() for field in
               ("backend", "target", "board", "compiler", "application")}
-    demands = [_event(reader) for _ in range(demand_count)]
+    demands = [{"event": _event(reader), "handler": reader.text(),
+                "context": reader.text(), "delivery": reader.text()}
+               for _ in range(demand_count)]
     bindings = []
     for _ in range(binding_count):
         event = _event(reader)

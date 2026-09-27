@@ -28,7 +28,10 @@ consteval std::size_t probe_record_size() {
   for (std::size_t i = 0; i < demands.count; ++i) {
     const auto& event = demands.keys[i];
     size += encoded_text_size(event.instance) + encoded_text_size(event.request)
-      + encoded_text_size(event.kind);
+      + encoded_text_size(event.kind)
+      + encoded_text_size(demands.handlers[i])
+      + encoded_text_size(demands.contexts[i])
+      + encoded_text_size(demands.deliveries[i]);
   }
   for (std::size_t i = 0; i < selected.count; ++i) {
     const auto& binding = selected.bindings[i];
@@ -73,7 +76,7 @@ consteval auto encode_probe_record() {
     for (char character : value) { byte(static_cast<unsigned char>(character)); }
   };
   byte('G'); byte('I'); byte('R'); byte('Q');
-  word(1); dword(static_cast<unsigned long>(length));
+  word(2); dword(static_cast<unsigned long>(length));
   word(static_cast<unsigned>(demands.count));
   word(static_cast<unsigned>(selected.count));
   string(Spec::Board::backend);
@@ -86,6 +89,9 @@ consteval auto encode_probe_record() {
     string(event.instance);
     string(event.request);
     string(event.kind);
+    string(demands.handlers[i]);
+    string(demands.contexts[i]);
+    string(demands.deliveries[i]);
   }
   for (std::size_t i = 0; i < selected.count; ++i) {
     const auto& binding = selected.bindings[i];

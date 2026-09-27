@@ -112,10 +112,11 @@ Known inherited limitations, explicitly deferred to focused correctness changes:
 - `RootDependencies<T>` returns an empty tuple for a resource whose own
   `dependencies` is empty, although nested traversal treats that resource as a
   root. This legacy distinction is preserved and covered by static assertions.
-- `allocation.hpp` contains only the legacy `SelectionResolver` pass-through
-  placeholder; the new installed search is in `allocation/search.hpp`, with
-  application integration in `allocated_application.hpp`. Resource graph cycles beyond the
-  documented self-root convention are unsupported; use an acyclic graph.
+- Resource graph cycles beyond the documented self-root convention are
+  unsupported; use an acyclic graph.
+
+The installed search is in `allocation/search.hpp`, with application
+integration in `allocated_application.hpp`.
 
 The original source remains in Ardoinus. Source history import, API namespace
 modernization and eventual removal from the original checkout are separate work.

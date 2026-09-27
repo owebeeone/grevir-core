@@ -1,7 +1,6 @@
 #pragma once
 
 #include <GrevirBase.h>
-#include <grevir/core/allocation.hpp>
 #include <grevir/core/application.hpp>
 #include <grevir/core/board.hpp>
 #include <grevir/core/device_map.hpp>
