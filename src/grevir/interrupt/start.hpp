@@ -1,6 +1,7 @@
 #pragma once
 
 #include <grevir/interrupt/install.hpp>
+#include <grevir/interrupt/binding.hpp>
 #include <grevir/event/queue.hpp>
 
 namespace grevir::interrupt {
@@ -25,7 +26,7 @@ struct Application {
   static StartResult start() noexcept {
     return Board::template StartPolicy<Spec>::execute([]() noexcept {
       Board::mask_owned();
-      if constexpr (requires { Board::event_queue_capacity; typename Board::EventLock; }) {
+      if constexpr (DeferredContextPlan<Spec>::selected) {
         event::prepare<Spec>();
       }
       if (!Board::template configure<Spec>()) {
@@ -46,7 +47,7 @@ struct Application {
  private:
   static StartResult fail(SetupOutcome reason) noexcept {
     Board::mask_owned();
-    if constexpr (requires { Board::event_queue_capacity; typename Board::EventLock; }) {
+    if constexpr (DeferredContextPlan<Spec>::selected) {
       event::stop<Spec>();
     }
     if (!Board::cleanup()) {
