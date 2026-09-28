@@ -8,10 +8,10 @@ namespace grevir::interrupt {
 
 enum class SetupOutcome {
   success, event_context_failed, configuration_failed, registration_failed,
-  pending_policy_failed, cleanup_failed
+  pending_policy_failed, cleanup_failed, in_progress
 };
 
-enum class CallDisposition { initiated, waited, replayed };
+enum class CallDisposition { initiated, waited, replayed, in_progress };
 
 struct StartResult {
   SetupOutcome outcome = SetupOutcome::success;
