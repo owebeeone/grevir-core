@@ -17,22 +17,29 @@ struct Request { using InterruptEvents = setl::TypeArgs<A, B, C, S>; };
 template <class>
 struct Module : ardo::ModuleBase<ardo::Parameters<>> {};
 using Owner = grevir::RequestedModule<setl::TypeArgs<Request>, Module>;
+template <class Spec>
 struct MainLoopContext {
+  inline static constexpr std::string_view identity{"host_thread_v1", 14};
   inline static thread_local unsigned char token = 0;
-  inline static std::atomic<const void*> owner{nullptr};
-  static void bind() noexcept {
-    owner.store(&token, std::memory_order_release);
+  inline static const void* owner = nullptr;
+  static const void* current_token() noexcept { return &token; }
+  static void bind(const void* selected) noexcept {
+    owner = selected;
   }
-  static bool is_current() noexcept {
-    return owner.load(std::memory_order_acquire) == &token;
+  static bool is_owner(const void* selected) noexcept {
+    return owner == selected;
   }
 };
 struct Board {
   using EventLock = grevir::test::EventLock;
-  using MainLoopContext = event_queue_test::MainLoopContext;
+  template <class Spec>
+  using MainLoopContext = event_queue_test::MainLoopContext<Spec>;
   inline static constexpr unsigned event_queue_capacity = 2;
 };
 using App = grevir::ApplicationSpec<Board, Owner>;
+static_assert(grevir::event::detail::ContextPolicyIdentity<
+  grevir::test::EventLock, MainLoopContext<App>>::value
+  == irq::literal("host_mutex_v1_host_thread_v1"));
 
 inline std::vector<char> seen{};
 inline bool rearm_a = false;
@@ -171,17 +178,32 @@ TEST_CASE("main-loop callbacks stay on the task that prepared the queue", "[core
   grevir::event::prepare<App>();
   REQUIRE(grevir::event::post<App, A>() == grevir::event::PostResult::queued);
   std::size_t foreign_dispatch = 99;
+  bool foreign_prepare = true;
   grevir::event::PostResult foreign_post = grevir::event::PostResult::not_ready;
   std::thread foreign([&] {
     foreign_post = grevir::event::post<App, B>();
+    foreign_prepare = grevir::event::prepare<App>();
     foreign_dispatch = grevir::event::dispatch<App>(1);
   });
   foreign.join();
   REQUIRE(foreign_post == grevir::event::PostResult::queued);
+  REQUIRE_FALSE(foreign_prepare);
   REQUIRE(foreign_dispatch == 0);
   REQUIRE(seen.empty());
   REQUIRE(grevir::event::dispatch<App>(2) == 2);
   REQUIRE(seen == std::vector<char>{'a', 'b'});
+  grevir::event::stop<App>();
+  bool rebound = false;
+  std::size_t transferred_dispatch = 0;
+  std::thread next_owner([&] {
+    rebound = grevir::event::prepare<App>();
+    (void)grevir::event::post<App, A>();
+    transferred_dispatch = grevir::event::dispatch<App>(1);
+  });
+  next_owner.join();
+  REQUIRE(rebound);
+  REQUIRE(transferred_dispatch == 1);
+  REQUIRE(seen == std::vector<char>{'a', 'b', 'a'});
   grevir::event::stop<App>();
 }
 

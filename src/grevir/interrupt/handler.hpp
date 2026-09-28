@@ -108,6 +108,7 @@ void dispatch_bound_interrupt() noexcept {
     if constexpr (requires {
       Application::Board::event_queue_capacity;
       typename Application::Board::EventLock;
+      typename Application::Board::template MainLoopContext<Application>;
     }) {
       (void)grevir::event::post_from_isr<Application, Event>();
     } else {

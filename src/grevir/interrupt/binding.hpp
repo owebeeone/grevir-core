@@ -2,6 +2,7 @@
 
 #include <grevir/interrupt/catalog.hpp>
 #include <grevir/event/queue_capacity.hpp>
+#include <grevir/event/context_policy.hpp>
 #if defined(GREVIR_IRQ_PROBE)
 #include <grevir/interrupt/demand.hpp>
 #endif
@@ -162,22 +163,39 @@ struct DeferredContextPlan {
     }
     return false;
   }();
-  inline static constexpr bool available = requires {
-    Board::event_queue_capacity;
-    typename Board::EventLock;
-    Board::EventLock::identity;
-  };
+  inline static constexpr bool available = [] {
+    if constexpr (requires {
+      Board::event_queue_capacity;
+      typename Board::EventLock;
+      typename Board::EventLock::TaskGuard;
+      typename Board::EventLock::IsrGuard;
+      Board::EventLock::identity;
+      typename Board::template MainLoopContext<Spec>;
+    }) {
+      using Context = typename Board::template MainLoopContext<Spec>;
+      return requires {
+        Context::identity;
+        Context::current_token();
+        Context::bind(Context::current_token());
+        static_cast<bool>(Context::is_owner(Context::current_token()));
+      };
+    } else {
+      return false;
+    }
+  }();
   static_assert(!selected || available, "GREVIR_EVENT_CONTEXT_UNAVAILABLE");
   inline static constexpr unsigned capacity =
     event::detail::SelectedQueueCapacity<Board, selected && available>::value;
   inline static constexpr std::string_view policy = [] {
     if constexpr (selected && available) {
-      return std::string_view{Board::EventLock::identity};
+      using Context = typename Board::template MainLoopContext<Spec>;
+      return event::detail::ContextPolicyIdentity<typename Board::EventLock,
+        Context>::value;
     } else {
       return std::string_view{};
     }
   }();
-  static_assert(!selected || valid_component(policy),
+  static_assert(!selected || !available || valid_component(policy),
     "GREVIR_EVENT_POLICY_ID_INVALID");
 };
 

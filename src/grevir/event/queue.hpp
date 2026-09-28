@@ -2,6 +2,7 @@
 
 #include <grevir/event/route.hpp>
 #include <grevir/event/queue_capacity.hpp>
+#include <grevir/event/context_policy.hpp>
 #include <grevir/interrupt/catalog.hpp>
 #include <grevir/base/type_for_size.hpp>
 #include <grevir/base/compat/cstddef.hpp>
@@ -27,21 +28,23 @@ struct Pending {
 template <class Spec>
 class MainLoopQueue {
   using Board = typename Spec::Board;
+  using Context = typename Board::template MainLoopContext<Spec>;
   static constexpr std::size_t capacity = QueueCapacity<Board>::value;
   using index_type = typename setl::TypeForMaxValue<
     static_cast<std::uint32_t>(capacity)>::selected::type_unsigned;
 
  public:
-  static void prepare() noexcept {
-    if constexpr (requires { typename Board::MainLoopContext; }) {
-      Board::MainLoopContext::bind();
-    }
+  static bool prepare() noexcept {
+    const auto current = Context::current_token();
     typename Board::EventLock::TaskGuard lock{};
+    if (ready_ || dispatching_) { return false; }
+    Context::bind(current);
     clear_records();
     head_ = 0;
     count_ = 0;
     overrun_ = false;
     ready_ = true;
+    return true;
   }
 
   static void stop() noexcept {
@@ -64,12 +67,10 @@ class MainLoopQueue {
 
   static std::size_t dispatch(std::size_t budget) noexcept {
     if (budget == 0) { return 0; }
-    if constexpr (requires { typename Board::MainLoopContext; }) {
-      if (!Board::MainLoopContext::is_current()) { return 0; }
-    }
+    const auto current = Context::current_token();
     {
       typename Board::EventLock::TaskGuard lock{};
-      if (!ready_ || dispatching_) { return 0; }
+      if (!ready_ || dispatching_ || !Context::is_owner(current)) { return 0; }
       dispatching_ = true;
     }
     std::size_t handled = 0;
@@ -159,7 +160,7 @@ class MainLoopQueue {
 } // namespace detail
 
 template <class Spec>
-void prepare() noexcept { detail::MainLoopQueue<Spec>::prepare(); }
+bool prepare() noexcept { return detail::MainLoopQueue<Spec>::prepare(); }
 
 template <class Spec>
 void stop() noexcept { detail::MainLoopQueue<Spec>::stop(); }

@@ -7,7 +7,7 @@
 namespace grevir::interrupt {
 
 enum class SetupOutcome {
-  success, configuration_failed, registration_failed,
+  success, event_context_failed, configuration_failed, registration_failed,
   pending_policy_failed, cleanup_failed
 };
 
@@ -27,7 +27,9 @@ struct Application {
     return Board::template StartPolicy<Spec>::execute([]() noexcept {
       Board::mask_owned();
       if constexpr (DeferredContextPlan<Spec>::selected) {
-        event::prepare<Spec>();
+        if (!event::prepare<Spec>()) {
+          return fail(SetupOutcome::event_context_failed, false);
+        }
       }
       if (!Board::template configure<Spec>()) {
         return fail(SetupOutcome::configuration_failed);
@@ -45,10 +47,10 @@ struct Application {
   }
 
  private:
-  static StartResult fail(SetupOutcome reason) noexcept {
+  static StartResult fail(SetupOutcome reason, bool queue_prepared = true) noexcept {
     Board::mask_owned();
     if constexpr (DeferredContextPlan<Spec>::selected) {
-      event::stop<Spec>();
+      if (queue_prepared) { event::stop<Spec>(); }
     }
     if (!Board::cleanup()) {
       return {SetupOutcome::cleanup_failed, reason, CallDisposition::initiated};
