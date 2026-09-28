@@ -2,6 +2,7 @@
 #include <grevir/event/queue.hpp>
 #include <grevir/test/event_lock.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <array>
 #include <atomic>
 #include <thread>
 #include <vector>
@@ -48,6 +49,22 @@ static_assert(grevir::event::detail::ContextPolicyIdentity<
   LockAlphaBeta, ContextGamma>::value
   != grevir::event::detail::ContextPolicyIdentity<
     LockAlpha, ContextBetaGamma>::value);
+template <std::size_t N>
+consteval auto repeated_identity() {
+  std::array<char, N> result{};
+  result.fill('a');
+  return result;
+}
+struct LockAtLimit {
+  inline static constexpr auto storage = repeated_identity<121>();
+  inline static constexpr std::string_view identity{storage.data(), storage.size()};
+};
+struct ContextAtLimit {
+  inline static constexpr auto storage = repeated_identity<123>();
+  inline static constexpr std::string_view identity{storage.data(), storage.size()};
+};
+static_assert(grevir::event::detail::ContextPolicyIdentity<
+  LockAtLimit, ContextAtLimit>::value.size() == 255);
 
 inline std::vector<char> seen{};
 inline bool rearm_a = false;

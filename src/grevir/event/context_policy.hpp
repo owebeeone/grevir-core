@@ -35,7 +35,8 @@ struct ContextPolicyIdentity {
   // Format: l<lock-length>_<lock>_c<context-length>_<context>.
   inline static constexpr std::size_t length = 1 + lock_digits + 1 + lock.size()
     + 2 + context_digits + 1 + context.size();
-  static_assert(length <= 65535, "GREVIR_EVENT_POLICY_ID_TOO_LONG");
+  // The interrupt probe stores this complete identity in one length byte.
+  static_assert(length <= 255, "GREVIR_EVENT_POLICY_ID_TOO_LONG");
 
   struct Storage { char bytes[length + 1]{}; };
   inline static constexpr Storage storage = [] {
