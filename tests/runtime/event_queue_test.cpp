@@ -39,7 +39,15 @@ struct Board {
 using App = grevir::ApplicationSpec<Board, Owner>;
 static_assert(grevir::event::detail::ContextPolicyIdentity<
   grevir::test::EventLock, MainLoopContext<App>>::value
-  == irq::literal("host_mutex_v1_host_thread_v1"));
+  == irq::literal("l13_host_mutex_v1_c14_host_thread_v1"));
+struct LockAlphaBeta { inline static constexpr std::string_view identity{"alpha_beta", 10}; };
+struct LockAlpha { inline static constexpr std::string_view identity{"alpha", 5}; };
+struct ContextGamma { inline static constexpr std::string_view identity{"gamma", 5}; };
+struct ContextBetaGamma { inline static constexpr std::string_view identity{"beta_gamma", 10}; };
+static_assert(grevir::event::detail::ContextPolicyIdentity<
+  LockAlphaBeta, ContextGamma>::value
+  != grevir::event::detail::ContextPolicyIdentity<
+    LockAlpha, ContextBetaGamma>::value);
 
 inline std::vector<char> seen{};
 inline bool rearm_a = false;

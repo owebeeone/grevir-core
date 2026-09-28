@@ -189,6 +189,9 @@ struct DeferredContextPlan {
   inline static constexpr std::string_view policy = [] {
     if constexpr (selected && available) {
       using Context = typename Board::template MainLoopContext<Spec>;
+      static_assert(valid_component(std::string_view{Board::EventLock::identity})
+        && valid_component(std::string_view{Context::identity}),
+        "GREVIR_EVENT_POLICY_COMPONENT_INVALID");
       return event::detail::ContextPolicyIdentity<typename Board::EventLock,
         Context>::value;
     } else {

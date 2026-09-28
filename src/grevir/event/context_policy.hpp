@@ -22,13 +22,39 @@ template <class Lock, class Context>
 struct ContextPolicyIdentity {
   inline static constexpr std::string_view lock{Lock::identity};
   inline static constexpr std::string_view context{Context::identity};
-  inline static constexpr std::size_t length = lock.size() + 1 + context.size();
+
+  static consteval std::size_t digits(std::size_t value) {
+    std::size_t count = 1;
+    while (value >= 10) { value /= 10; ++count; }
+    return count;
+  }
+
+  inline static constexpr std::size_t lock_digits = digits(lock.size());
+  inline static constexpr std::size_t context_digits = digits(context.size());
+  // Lengths make the one-field encoding injective even when names contain '_'.
+  // Format: l<lock-length>_<lock>_c<context-length>_<context>.
+  inline static constexpr std::size_t length = 1 + lock_digits + 1 + lock.size()
+    + 2 + context_digits + 1 + context.size();
+  static_assert(length <= 65535, "GREVIR_EVENT_POLICY_ID_TOO_LONG");
 
   struct Storage { char bytes[length + 1]{}; };
   inline static constexpr Storage storage = [] {
     Storage result{};
     std::size_t offset = 0;
+    const auto append_number = [&](std::size_t value, std::size_t width) {
+      for (std::size_t i = 0; i < width; ++i) {
+        result.bytes[offset + width - 1 - i] = static_cast<char>('0' + value % 10);
+        value /= 10;
+      }
+      offset += width;
+    };
+    result.bytes[offset++] = 'l';
+    append_number(lock.size(), lock_digits);
+    result.bytes[offset++] = '_';
     for (char value : lock) { result.bytes[offset++] = value; }
+    result.bytes[offset++] = '_';
+    result.bytes[offset++] = 'c';
+    append_number(context.size(), context_digits);
     result.bytes[offset++] = '_';
     for (char value : context) { result.bytes[offset++] = value; }
     return result;
